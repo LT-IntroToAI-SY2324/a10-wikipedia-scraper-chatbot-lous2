@@ -2,8 +2,6 @@ import re, string, calendar
 from wikipedia import WikipediaPage
 import wikipedia
 from bs4 import BeautifulSoup
-from nltk import word_tokenize, pos_tag, ne_chunk
-from nltk.tree import Tree
 from match import match
 from typing import List, Callable, Tuple, Any, Match
 
@@ -111,11 +109,44 @@ def get_birth_date(name: str) -> str:
 
     return match.group("birth")
 
+def get_hometown(person_name: str) -> str:
+    """Fetches the hometown of a person
+
+    Args:
+        person_name: Name of the person
+
+    Returns:
+        Hometown of the person
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(person_name)))
+    pattern = r"(?:Hometown\D*)(?P<hometown>[\w\s,]+)"
+    error_message = "No hometown information found in infobox"
+    
+    try:
+        match = get_match(infobox_text, pattern, error_message)
+        return match.group("hometown")
+    except AttributeError:
+        # If not found in the infobox, search the entire page
+        full_text = clean_text(get_page_html(person_name))
+        pattern = r"(?:Hometown|Place of birth|Born in)\D*(?P<hometown>[\w\s,]+)"
+        match = get_match(full_text, pattern, "No hometown information found in the page")
+        return match.group("hometown")
+
 
 # below are a set of actions. Each takes a list argument and returns a list of answers
 # according to the action and the argument. It is important that each function returns a
 # list of the answer(s) and not just the answer itself.
 
+def action_hometown(matches: List[str]) -> List[str]:
+    """Returns hometown of the named person in matches
+
+    Args:
+        matches: List of matches from pattern of person's name
+
+    Returns:
+        Hometown of the named person
+    """
+    return [get_hometown(" ".join(matches))]
 
 def birth_date(matches: List[str]) -> List[str]:
     """Returns birth date of named person in matches
@@ -156,6 +187,13 @@ Action = Callable[[List[str]], List[Any]]
 pa_list: List[Tuple[Pattern, Action]] = [
     ("when was % born".split(), birth_date),
     ("what is the polar radius of %".split(), polar_radius),
+
+    ("where is % from".split(), action_hometown),
+    ("where was % born".split(), action_hometown),
+    ("where did % grow up".split(), action_hometown),
+    ("which city is % from".split(), action_hometown),
+    ("what city is % from".split(), action_hometown),
+
     (["bye"], bye_action),
 ]
 
